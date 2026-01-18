@@ -77,6 +77,7 @@ type Model struct {
 	radarMode       api.RadarMode
 	radarFrameIndex int
 	radarAnimating  bool
+	radarGeneration int // Incremented when new radar data loads to invalidate old ticks
 }
 
 // Messages
@@ -100,12 +101,14 @@ type errMsg struct {
 	err error
 }
 
-type radarTickMsg struct{}
+type radarTickMsg struct {
+	generation int // Which radar generation this tick belongs to
+}
 
 // radarTick returns a command that ticks the radar animation
-func radarTick() tea.Cmd {
+func radarTick(generation int) tea.Cmd {
 	return tea.Tick(500*time.Millisecond, func(t time.Time) tea.Msg {
-		return radarTickMsg{}
+		return radarTickMsg{generation: generation}
 	})
 }
 
@@ -198,7 +201,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.loading = true
 					return m, fetchRadar(m.apiClient, m.location.Latitude, m.location.Longitude, m.radarMode)
 				} else if m.radarAnimating && m.radar != nil {
-					return m, radarTick()
+					m.radarGeneration++ // Invalidate any pending ticks from before we left
+					return m, radarTick(m.radarGeneration)
 				}
 			}
 		case "shift+tab", "left":
@@ -208,7 +212,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.loading = true
 					return m, fetchRadar(m.apiClient, m.location.Latitude, m.location.Longitude, m.radarMode)
 				} else if m.radarAnimating && m.radar != nil {
-					return m, radarTick()
+					m.radarGeneration++ // Invalidate any pending ticks from before we left
+					return m, radarTick(m.radarGeneration)
 				}
 			}
 		case "1":
@@ -223,7 +228,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.loading = true
 				return m, fetchRadar(m.apiClient, m.location.Latitude, m.location.Longitude, m.radarMode)
 			} else if m.radarAnimating && m.radar != nil {
-				return m, radarTick()
+				m.radarGeneration++ // Invalidate any pending ticks from before we left
+				return m, radarTick(m.radarGeneration)
 			}
 		case "s":
 			m.mode = ModeSearch
@@ -278,7 +284,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.activeView == ViewRadar {
 				m.radarAnimating = !m.radarAnimating
 				if m.radarAnimating {
-					return m, radarTick()
+					m.radarGeneration++ // Invalidate any stale ticks
+					return m, radarTick(m.radarGeneration)
 				}
 			}
 		}
@@ -297,10 +304,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.loading = false
 		m.radar = msg.radar
 		m.radarFrameIndex = 0
+		m.radarGeneration++ // Increment generation to invalidate any pending ticks from old data
 		m.err = nil
 		// Start animation if enabled
 		if m.radarAnimating && m.activeView == ViewRadar {
-			return m, radarTick()
+			return m, radarTick(m.radarGeneration)
 		}
 
 	case locationDetectedMsg:
@@ -324,10 +332,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 
 	case radarTickMsg:
-		// Advance radar animation frame
+		// Advance radar animation frame, but only if this tick is from the current generation
+		if msg.generation != m.radarGeneration {
+			// Stale tick from old radar data, ignore it
+			return m, nil
+		}
 		if m.activeView == ViewRadar && m.radarAnimating && m.radar != nil && len(m.radar.Frames) > 0 {
 			m.radarFrameIndex = (m.radarFrameIndex + 1) % len(m.radar.Frames)
-			return m, radarTick()
+			return m, radarTick(m.radarGeneration)
 		}
 	}
 

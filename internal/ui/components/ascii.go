@@ -46,46 +46,46 @@ func SmallWeatherIcon(category string, isDay bool) string {
 	}
 }
 
-const sunnyDay = `    \   /
-     .-.
-  - (   ) -
-     '-'
+const sunnyDay = `    \   /    
+     .-.     
+  - (   ) -  
+     '-'     
     /   \    `
 
-const clearNight = `       *
-    *
-  *     *
-     C
+const clearNight = `       *     
+    *        
+  *     *    
+     C       
     *   *    `
 
-const cloudy = `
-     .--.
-  .-(    ).
- (___.__)__)
+const cloudy = `             
+     .--.    
+  .-(    ).  
+ (___.__)__) 
              `
 
-const foggy = `
- _ - _ - _ -
-  _ - _ - _
- _ - _ - _ -
+const foggy = `             
+ _ - _ - _ - 
+  _ - _ - _  
+ _ - _ - _ - 
              `
 
-const rainy = `     .-.
-    (   ).
-   (___(__)
-    ' ' ' '
+const rainy = `     .-.     
+    (   ).   
+   (___(__)  
+    ' ' ' '  
    ' ' ' '   `
 
-const snowy = `     .-.
-    (   ).
-   (___(__)
-    * * * *
+const snowy = `     .-.     
+    (   ).   
+   (___(__)  
+    * * * *  
    * * * *   `
 
-const stormy = `     .-.
-    (   ).
-   (___(__)
-   ⚡' '⚡
+const stormy = `     .-.     
+    (   ).   
+   (___(__)  
+   ⚡' '⚡   
    ' ' ' '   `
 
 // WindDirection returns an arrow for wind direction

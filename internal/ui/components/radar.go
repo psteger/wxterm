@@ -11,10 +11,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// ASCII character gradient from light to heavy (like the Python implementation)
-// Space = no precipitation, then increasing density
-const asciiGradient = " ░░▒▒▓▓██"
-
 var (
 	radarTitleStyle = lipgloss.NewStyle().
 			Bold(true).
@@ -83,8 +79,8 @@ func RenderRadar(radar *api.RadarData, width, height int, frameIndex int) string
 	return b.String()
 }
 
-// imageToColoredASCII converts an image to colored ASCII art
-// Uses the original image colors with ASCII density characters
+// imageToColoredASCII converts an image to colored ASCII art using half-block characters
+// Each character cell represents 2 vertical pixels using ▀ with foreground (top) and background (bottom) colors
 func imageToColoredASCII(img image.Image, width, height int) string {
 	if img == nil {
 		return ""
@@ -101,9 +97,11 @@ func imageToColoredASCII(img image.Image, width, height int) string {
 	// Crop the image to remove top 2 lines and bottom 1 line worth of pixels
 	// Calculate how many pixels to crop based on output height ratio
 	cropTopLines := 2
-	cropBottomLines := 1
-	cropTopPixels := int(float64(cropTopLines) * float64(imgHeight) / float64(height+cropTopLines+cropBottomLines))
-	cropBottomPixels := int(float64(cropBottomLines) * float64(imgHeight) / float64(height+cropTopLines+cropBottomLines))
+	cropBottomLines := 2
+	// With half-blocks, each output row represents 2 pixel rows
+	effectiveHeight := height * 2
+	cropTopPixels := int(float64(cropTopLines*2) * float64(imgHeight) / float64(effectiveHeight+cropTopLines*2+cropBottomLines*2))
+	cropBottomPixels := int(float64(cropBottomLines*2) * float64(imgHeight) / float64(effectiveHeight+cropTopLines*2+cropBottomLines*2))
 
 	// Adjust bounds to crop the image
 	croppedMinY := bounds.Min.Y + cropTopPixels
@@ -115,66 +113,59 @@ func imageToColoredASCII(img image.Image, width, height int) string {
 	}
 
 	// Calculate scaling factors
-	// Terminal characters are roughly twice as tall as wide, so we need to
-	// sample more horizontal pixels per character to compensate
-	// We also halve the output width since we're sampling 2x horizontally
+	// Terminal characters are roughly twice as tall as wide, so we halve the output width
+	// Each character represents 2 vertical pixels (top and bottom half)
 	outputWidth := width / 2
 	scaleX := float64(imgWidth) / float64(outputWidth)
-	scaleY := float64(croppedHeight) / float64(height)
+	scaleY := float64(croppedHeight) / float64(height*2) // *2 because each row = 2 pixel rows
 
 	var b strings.Builder
-	gradientRunes := []rune(asciiGradient)
-	gradientLen := len(gradientRunes)
-
-	var lastColor string
 
 	for y := 0; y < height; y++ {
 		for x := 0; x < outputWidth; x++ {
-			// Sample the source image from the cropped region
+			// Sample two vertical pixels for this character cell
 			srcX := int(float64(x) * scaleX)
-			srcY := int(float64(y) * scaleY)
+			srcYTop := int(float64(y*2) * scaleY)
+			srcYBottom := int(float64(y*2+1) * scaleY)
 
 			if srcX >= imgWidth {
 				srcX = imgWidth - 1
 			}
-			if srcY >= croppedHeight {
-				srcY = croppedHeight - 1
+			if srcYTop >= croppedHeight {
+				srcYTop = croppedHeight - 1
+			}
+			if srcYBottom >= croppedHeight {
+				srcYBottom = croppedHeight - 1
 			}
 
-			// Get pixel color - handles both paletted and RGBA images
-			pixel := img.At(srcX+bounds.Min.X, srcY+croppedMinY)
-			r8, g8, b8, a8 := colorToRGBA(pixel)
+			// Get top and bottom pixel colors
+			topPixel := img.At(srcX+bounds.Min.X, srcYTop+croppedMinY)
+			bottomPixel := img.At(srcX+bounds.Min.X, srcYBottom+croppedMinY)
 
-			// Calculate grayscale intensity for character selection
-			gray := (int(r8) + int(g8) + int(b8)) / 3
+			rTop, gTop, bTop, aTop := colorToRGBA(topPixel)
+			rBot, gBot, bBot, aBot := colorToRGBA(bottomPixel)
 
-			// Map intensity to character
-			charIdx := gray * (gradientLen - 1) / 255
-			if charIdx >= gradientLen {
-				charIdx = gradientLen - 1
-			}
-			char := string(gradientRunes[charIdx])
+			// Check transparency
+			topTransparent := aTop < 30
+			bottomTransparent := aBot < 30
 
-			// Skip fully transparent pixels
-			if a8 < 30 {
+			if topTransparent && bottomTransparent {
+				// Both transparent - just a space
 				b.WriteString(" ")
-				continue
+			} else if topTransparent {
+				// Only bottom visible - use lower half block with foreground color
+				b.WriteString(fmt.Sprintf("\033[38;2;%d;%d;%dm▄\033[0m", rBot, gBot, bBot))
+			} else if bottomTransparent {
+				// Only top visible - use upper half block with foreground color
+				b.WriteString(fmt.Sprintf("\033[38;2;%d;%d;%dm▀\033[0m", rTop, gTop, bTop))
+			} else {
+				// Both visible - use upper half block with foreground (top) and background (bottom)
+				// Format: \033[38;2;R;G;Bm for foreground, \033[48;2;R;G;Bm for background
+				b.WriteString(fmt.Sprintf("\033[38;2;%d;%d;%dm\033[48;2;%d;%d;%dm▀\033[0m",
+					rTop, gTop, bTop, rBot, gBot, bBot))
 			}
-
-			// Use true color ANSI escape for the character
-			// Format: \033[38;2;R;G;Bm
-			colorCode := fmt.Sprintf("\033[38;2;%d;%d;%dm", r8, g8, b8)
-
-			// Optimization: only emit color code if it changed
-			if colorCode != lastColor {
-				b.WriteString("\033[0m") // Reset first
-				b.WriteString(colorCode)
-				lastColor = colorCode
-			}
-			b.WriteString(char)
 		}
-		b.WriteString("\033[0m\n") // Reset at end of line
-		lastColor = ""
+		b.WriteString("\n")
 	}
 
 	return b.String()

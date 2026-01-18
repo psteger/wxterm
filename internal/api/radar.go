@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 	"image"
 	"image/color"
@@ -10,6 +11,23 @@ import (
 	"net/http"
 	"time"
 )
+
+// ErrOutsideCONUS is returned when radar is requested for a location outside the continental US
+var ErrOutsideCONUS = errors.New("radar not available outside continental US")
+
+// Continental US bounding box (approximate)
+const (
+	conusMinLat = 24.0  // Southern tip of Florida/Texas
+	conusMaxLat = 50.0  // Northern border with Canada
+	conusMinLon = -125.0 // Pacific coast
+	conusMaxLon = -66.0  // Atlantic coast (Maine)
+)
+
+// IsInContinentalUS returns true if the coordinates are within the continental US
+func IsInContinentalUS(lat, lon float64) bool {
+	return lat >= conusMinLat && lat <= conusMaxLat &&
+		lon >= conusMinLon && lon <= conusMaxLon
+}
 
 // Base URL for RIDGE II standard radar GIFs
 const ridgeStandardBaseURL = "https://radar.weather.gov/ridge/standard"
@@ -207,11 +225,7 @@ var nwsOffices = []NWSOffice{
 	{"sew", "ATX", "Seattle, WA", 48.1947, -122.4958},
 	{"otx", "OTX", "Spokane, WA", 47.6803, -117.6267},
 
-	// Alaska & Hawaii
-	{"afg", "APD", "Fairbanks, AK", 65.0356, -147.5014},
-	{"ajk", "ACG", "Juneau, AK", 56.8525, -135.5294},
-	{"afc", "AHG", "Anchorage, AK", 60.7258, -151.3511},
-	{"hfo", "HKI", "Honolulu, HI", 21.3069, -157.8583},
+	// Note: Alaska and Hawaii removed - no RIDGE radar coverage
 }
 
 // findRegionalSector finds the best matching regional sector for coordinates
@@ -248,6 +262,11 @@ func findRegionalSector(lat, lon float64) RadarSector {
 
 // FetchRadar fetches radar imagery from weather.gov for a location
 func (c *Client) FetchRadar(lat, lon float64, mode RadarMode) (*RadarData, error) {
+	// Check if location is within continental US
+	if !IsInContinentalUS(lat, lon) {
+		return nil, ErrOutsideCONUS
+	}
+
 	var url string
 	var stationID string
 	var stationName string
