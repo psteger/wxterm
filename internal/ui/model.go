@@ -9,6 +9,7 @@ import (
 	"weatherterm/internal/api"
 	"weatherterm/internal/config"
 	"weatherterm/internal/location"
+	"weatherterm/internal/ui/components"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -73,11 +74,14 @@ type Model struct {
 	// Units
 	useImperial bool
 
-	// Radar mode and animation
-	radarMode       api.RadarMode
-	radarFrameIndex int
-	radarAnimating  bool
-	radarGeneration int // Incremented when new radar data loads to invalidate old ticks
+	// Radar viewport and animation
+	radarZoom       int
+	radarCenterLat  float64
+	radarCenterLon  float64
+	radarFrameIndex  int
+	radarAnimating   bool
+	radarGeneration  int // Incremented when new radar data loads to invalidate old ticks
+	radarLegendIndex int // Cycles through precipitation type legends
 }
 
 // Messages
@@ -153,6 +157,7 @@ func NewModel() Model {
 		config:         cfg,
 		useImperial:    useImperial,
 		radarAnimating: true, // Start with animation enabled
+		radarZoom:      6,
 	}
 }
 
@@ -194,28 +199,51 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
-		case "tab", "right":
+
+		// Radar pan (intercept arrow keys when on radar view)
+		case "up":
+			if m.activeView == ViewRadar {
+				return m.radarPan(0, -1)
+			}
+		case "down":
+			if m.activeView == ViewRadar {
+				return m.radarPan(0, 1)
+			}
+		case "right":
+			if m.activeView == ViewRadar {
+				return m.radarPan(1, 0)
+			}
 			m.activeView = (m.activeView + 1) % 4
+			return m.ensureRadarView()
+		case "left":
 			if m.activeView == ViewRadar {
-				if m.radar == nil && m.location.IsValid() {
-					m.loading = true
-					return m, fetchRadar(m.apiClient, m.location.Latitude, m.location.Longitude, m.radarMode)
-				} else if m.radarAnimating && m.radar != nil {
-					m.radarGeneration++ // Invalidate any pending ticks from before we left
-					return m, radarTick(m.radarGeneration)
-				}
+				return m.radarPan(-1, 0)
 			}
-		case "shift+tab", "left":
 			m.activeView = (m.activeView + 3) % 4
-			if m.activeView == ViewRadar {
-				if m.radar == nil && m.location.IsValid() {
-					m.loading = true
-					return m, fetchRadar(m.apiClient, m.location.Latitude, m.location.Longitude, m.radarMode)
-				} else if m.radarAnimating && m.radar != nil {
-					m.radarGeneration++ // Invalidate any pending ticks from before we left
-					return m, radarTick(m.radarGeneration)
-				}
+			return m.ensureRadarView()
+
+		// Radar zoom
+		case "+", "=":
+			if m.activeView == ViewRadar && m.radarZoom < 12 {
+				m.radarZoom++
+				m.radar = nil
+				m.loading = true
+				return m, m.radarViewCmd()
 			}
+		case "-":
+			if m.activeView == ViewRadar && m.radarZoom > 3 {
+				m.radarZoom--
+				m.radar = nil
+				m.loading = true
+				return m, m.radarViewCmd()
+			}
+
+		case "tab":
+			m.activeView = (m.activeView + 1) % 4
+			return m.ensureRadarView()
+		case "shift+tab":
+			m.activeView = (m.activeView + 3) % 4
+			return m.ensureRadarView()
 		case "1":
 			m.activeView = ViewCurrent
 		case "2":
@@ -224,13 +252,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.activeView = ViewDaily
 		case "4":
 			m.activeView = ViewRadar
-			if m.radar == nil && m.location.IsValid() {
-				m.loading = true
-				return m, fetchRadar(m.apiClient, m.location.Latitude, m.location.Longitude, m.radarMode)
-			} else if m.radarAnimating && m.radar != nil {
-				m.radarGeneration++ // Invalidate any pending ticks from before we left
-				return m, radarTick(m.radarGeneration)
-			}
+			return m.ensureRadarView()
 		case "s":
 			m.mode = ModeSearch
 			m.searchInput.Focus()
@@ -248,7 +270,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.location.IsValid() {
 				m.loading = true
 				if m.activeView == ViewRadar {
-					return m, fetchRadar(m.apiClient, m.location.Latitude, m.location.Longitude, m.radarMode)
+					m.radar = nil
+					return m, m.radarViewCmd()
 				}
 				return m, fetchWeather(m.apiClient, m.location.Latitude, m.location.Longitude)
 			}
@@ -265,28 +288,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.config.UseFahrenheit = m.useImperial
 				m.config.Save()
 			}
-		case "m":
-			// Toggle radar mode between local and regional
-			if m.radarMode == api.RadarModeLocal {
-				m.radarMode = api.RadarModeRegional
-			} else {
-				m.radarMode = api.RadarModeLocal
-			}
-			// If on radar view, refresh with new mode
-			if m.activeView == ViewRadar && m.location.IsValid() {
-				m.radar = nil
-				m.radarFrameIndex = 0
-				m.loading = true
-				return m, fetchRadar(m.apiClient, m.location.Latitude, m.location.Longitude, m.radarMode)
-			}
 		case " ":
 			// Toggle radar animation pause/play
 			if m.activeView == ViewRadar {
 				m.radarAnimating = !m.radarAnimating
 				if m.radarAnimating {
-					m.radarGeneration++ // Invalidate any stale ticks
+					m.radarGeneration++
 					return m, radarTick(m.radarGeneration)
 				}
+			}
+		case "p":
+			// Cycle precipitation legend type
+			if m.activeView == ViewRadar {
+				m.radarLegendIndex = (m.radarLegendIndex + 1) % components.NumRadarLegends()
 			}
 		}
 
@@ -297,7 +311,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// If on radar view and radar was cleared, fetch radar data
 		if m.activeView == ViewRadar && m.radar == nil && m.location.IsValid() {
 			m.loading = true
-			return m, fetchRadar(m.apiClient, m.location.Latitude, m.location.Longitude, m.radarMode)
+			return m, m.radarViewCmd()
 		}
 
 	case radarLoadedMsg:
@@ -313,6 +327,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case locationDetectedMsg:
 		m.location = msg.location
+		m.radarCenterLat = msg.location.Latitude
+		m.radarCenterLon = msg.location.Longitude
 		m.radar = nil // Clear radar when location changes
 		m.loading = true
 		return m, fetchWeather(m.apiClient, m.location.Latitude, m.location.Longitude)
@@ -337,8 +353,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Stale tick from old radar data, ignore it
 			return m, nil
 		}
-		if m.activeView == ViewRadar && m.radarAnimating && m.radar != nil && len(m.radar.Frames) > 0 {
-			m.radarFrameIndex = (m.radarFrameIndex + 1) % len(m.radar.Frames)
+		if m.activeView == ViewRadar && m.radarAnimating && m.radar != nil && len(m.radar.RainFrames) > 0 {
+			m.radarFrameIndex = (m.radarFrameIndex + 1) % len(m.radar.RainFrames)
 			return m, radarTick(m.radarGeneration)
 		}
 	}
@@ -375,6 +391,8 @@ func (m Model) handleSearchMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.searchInput.Blur()
 				m.searchInput.SetValue("")
 				m.searchResults = nil
+				m.radarCenterLat = result.Latitude
+				m.radarCenterLon = result.Longitude
 				m.radar = nil // Clear radar when location changes
 				m.loading = true
 				return m, fetchWeather(m.apiClient, m.location.Latitude, m.location.Longitude)
@@ -422,6 +440,8 @@ func (m Model) handleCoordinatesMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				Longitude: lon,
 			}
 			m.mode = ModeNormal
+			m.radarCenterLat = lat
+			m.radarCenterLon = lon
 			m.radar = nil // Clear radar when location changes
 			m.loading = true
 			return m, fetchWeather(m.apiClient, lat, lon)
@@ -459,6 +479,8 @@ func (m Model) handleSavedLocationsMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			loc := m.config.SavedLocations[m.selectedIndex]
 			m.location = loc
 			m.mode = ModeNormal
+			m.radarCenterLat = loc.Latitude
+			m.radarCenterLon = loc.Longitude
 			m.radar = nil // Clear radar when location changes
 			m.loading = true
 			return m, fetchWeather(m.apiClient, loc.Latitude, loc.Longitude)
@@ -497,14 +519,59 @@ func fetchWeather(client *api.Client, lat, lon float64) tea.Cmd {
 	}
 }
 
-func fetchRadar(client *api.Client, lat, lon float64, mode api.RadarMode) tea.Cmd {
+func fetchRadar(client *api.Client, lat, lon float64, zoom, viewWidth, viewHeight int) tea.Cmd {
 	return func() tea.Msg {
-		radar, err := client.FetchRadar(lat, lon, mode)
+		radar, err := client.FetchRadar(lat, lon, zoom, viewWidth, viewHeight)
 		if err != nil {
 			return errMsg{err}
 		}
 		return radarLoadedMsg{radar}
 	}
+}
+
+// radarViewCmd creates a command to fetch radar tiles for the current viewport
+func (m Model) radarViewCmd() tea.Cmd {
+	displayHeight := m.height - 10
+	if displayHeight < 10 {
+		displayHeight = 10
+	}
+	displayWidth := m.width
+	if displayWidth < 10 {
+		displayWidth = 10
+	}
+	return fetchRadar(m.apiClient, m.radarCenterLat, m.radarCenterLon, m.radarZoom, displayWidth, displayHeight)
+}
+
+// radarPan pans the radar view by the given direction (dx, dy each -1, 0, or 1)
+func (m Model) radarPan(dx, dy int) (tea.Model, tea.Cmd) {
+	displayHeight := m.height - 10
+	if displayHeight < 10 {
+		displayHeight = 10
+	}
+	// Pan by 1/4 of the viewport in braille pixels
+	panH := float64(m.width) / 2.0            // charWidth * 2 / 4
+	panV := float64(displayHeight)             // charHeight * 4 / 4
+	m.radarCenterLat, m.radarCenterLon = api.PanCenter(
+		m.radarCenterLat, m.radarCenterLon, m.radarZoom,
+		float64(dx)*panH, float64(dy)*panV)
+	m.radar = nil
+	m.loading = true
+	return m, m.radarViewCmd()
+}
+
+// ensureRadarView loads radar data if needed when switching to the radar view
+func (m Model) ensureRadarView() (tea.Model, tea.Cmd) {
+	if m.activeView == ViewRadar {
+		if m.radar == nil && m.location.IsValid() {
+			m.loading = true
+			return m, m.radarViewCmd()
+		}
+		if m.radarAnimating && m.radar != nil {
+			m.radarGeneration++
+			return m, radarTick(m.radarGeneration)
+		}
+	}
+	return m, nil
 }
 
 func searchLocation(client *api.Client, query string) tea.Cmd {

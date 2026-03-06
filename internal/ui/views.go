@@ -33,7 +33,7 @@ func (m Model) renderMainView() string {
 		}
 		return components.RenderDailyForecast(m.weather, m.width, m.useImperial)
 	case ViewRadar:
-		return components.RenderRadar(m.radar, m.width, m.height, m.radarFrameIndex)
+		return components.RenderRadar(m.radar, m.width, m.height, m.radarFrameIndex, m.radarLegendIndex)
 	default:
 		return "Unknown view"
 	}
@@ -97,11 +97,16 @@ l                 Enter coordinates manually
 ctrl+s            Save current location
 r                 Refresh weather/radar data
 
+Radar
+─────
+arrows            Pan radar map
++/-/=             Zoom radar in/out
+space             Pause/play radar animation
+p                 Cycle precipitation legend
+
 General
 ───────
 u                 Toggle metric/imperial units
-m                 Toggle radar mode (Local/Regional)
-space             Pause/play radar animation
 ?                 Show this help
 q / ctrl+c        Quit
 

@@ -16,6 +16,7 @@ const (
 // Client handles API requests to Open-Meteo
 type Client struct {
 	httpClient *http.Client
+	tileCache  *TileCache
 }
 
 // NewClient creates a new API client
@@ -24,6 +25,7 @@ func NewClient() *Client {
 		httpClient: &http.Client{
 			Timeout: defaultTimeout,
 		},
+		tileCache: NewTileCache(),
 	}
 }
 
