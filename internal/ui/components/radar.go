@@ -58,13 +58,14 @@ func RenderRadar(radar *api.RadarData, width, height int, frameIndex int, legend
 	b.WriteString("  ")
 	b.WriteString(radarInfoStyle.Render(fmt.Sprintf("%.2f\u00b0, %.2f\u00b0", radar.CenterLat, radar.CenterLon)))
 
+	var frameIdx int
 	if len(radar.RainFrames) > 0 {
-		idx := clampIndex(frameIndex, len(radar.RainFrames))
-		frame := radar.RainFrames[idx]
+		frameIdx = clampIndex(frameIndex, len(radar.RainFrames))
+		frame := radar.RainFrames[frameIdx]
 		b.WriteString("  ")
 		b.WriteString(radarTimestampStyle.Render(frame.Timestamp.Format("15:04")))
 		b.WriteString("  ")
-		b.WriteString(radarInfoStyle.Render(fmt.Sprintf("Frame %d/%d", idx+1, len(radar.RainFrames))))
+		b.WriteString(radarInfoStyle.Render(fmt.Sprintf("Frame %d/%d", frameIdx+1, len(radar.RainFrames))))
 	}
 	b.WriteString("\n")
 	b.WriteString(radarInfoStyle.Render("(arrows: pan, +/-: zoom, space: pause, p: precip type, r: refresh)"))
@@ -83,8 +84,7 @@ func RenderRadar(radar *api.RadarData, width, height int, frameIndex int, legend
 	// Get rain image for current frame
 	var rainImg image.Image
 	if len(radar.RainFrames) > 0 {
-		idx := clampIndex(frameIndex, len(radar.RainFrames))
-		rainImg = radar.RainFrames[idx].Image
+		rainImg = radar.RainFrames[frameIdx].Image
 	}
 
 	b.WriteString(renderBrailleMap(radar.MapImage, rainImg,
@@ -250,12 +250,7 @@ var radarLegends = []precipLegend{
 		{30, 0x08, 0x73, 0x05, "Heavy"},
 		{35, 0xff, 0xff, 0x00, "Intense"},
 	}},
-	{"Frz Rain", []legendEntry{
-		{10, 0x00, 0x9c, 0xf7, "Light"},
-		{20, 0x00, 0xff, 0x00, "Mod"},
-		{30, 0x08, 0x73, 0x05, "Heavy"},
-	}},
-	{"Mix", []legendEntry{
+	{"Frz/Mix", []legendEntry{
 		{10, 0x00, 0x9c, 0xf7, "Light"},
 		{20, 0x00, 0xff, 0x00, "Mod"},
 		{30, 0x08, 0x73, 0x05, "Heavy"},

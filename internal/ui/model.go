@@ -327,9 +327,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case locationDetectedMsg:
 		m.location = msg.location
-		m.radarCenterLat = msg.location.Latitude
-		m.radarCenterLon = msg.location.Longitude
-		m.radar = nil // Clear radar when location changes
+		m.resetRadarForLocation(msg.location.Latitude, msg.location.Longitude)
 		m.loading = true
 		return m, fetchWeather(m.apiClient, m.location.Latitude, m.location.Longitude)
 
@@ -391,9 +389,7 @@ func (m Model) handleSearchMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.searchInput.Blur()
 				m.searchInput.SetValue("")
 				m.searchResults = nil
-				m.radarCenterLat = result.Latitude
-				m.radarCenterLon = result.Longitude
-				m.radar = nil // Clear radar when location changes
+				m.resetRadarForLocation(result.Latitude, result.Longitude)
 				m.loading = true
 				return m, fetchWeather(m.apiClient, m.location.Latitude, m.location.Longitude)
 			}
@@ -440,9 +436,7 @@ func (m Model) handleCoordinatesMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				Longitude: lon,
 			}
 			m.mode = ModeNormal
-			m.radarCenterLat = lat
-			m.radarCenterLon = lon
-			m.radar = nil // Clear radar when location changes
+			m.resetRadarForLocation(lat, lon)
 			m.loading = true
 			return m, fetchWeather(m.apiClient, lat, lon)
 		}
@@ -479,9 +473,7 @@ func (m Model) handleSavedLocationsMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			loc := m.config.SavedLocations[m.selectedIndex]
 			m.location = loc
 			m.mode = ModeNormal
-			m.radarCenterLat = loc.Latitude
-			m.radarCenterLon = loc.Longitude
-			m.radar = nil // Clear radar when location changes
+			m.resetRadarForLocation(loc.Latitude, loc.Longitude)
 			m.loading = true
 			return m, fetchWeather(m.apiClient, loc.Latitude, loc.Longitude)
 		}
@@ -496,6 +488,13 @@ func (m Model) handleSavedLocationsMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	return m, nil
+}
+
+// resetRadarForLocation updates the radar center and invalidates cached radar data.
+func (m *Model) resetRadarForLocation(lat, lon float64) {
+	m.radarCenterLat = lat
+	m.radarCenterLon = lon
+	m.radar = nil
 }
 
 // Commands
@@ -529,25 +528,28 @@ func fetchRadar(client *api.Client, lat, lon float64, zoom, viewWidth, viewHeigh
 	}
 }
 
+// radarDisplaySize returns the clamped display dimensions for the radar viewport.
+func (m Model) radarDisplaySize() (width, height int) {
+	width = m.width
+	if width < 10 {
+		width = 10
+	}
+	height = m.height - 10
+	if height < 10 {
+		height = 10
+	}
+	return
+}
+
 // radarViewCmd creates a command to fetch radar tiles for the current viewport
 func (m Model) radarViewCmd() tea.Cmd {
-	displayHeight := m.height - 10
-	if displayHeight < 10 {
-		displayHeight = 10
-	}
-	displayWidth := m.width
-	if displayWidth < 10 {
-		displayWidth = 10
-	}
-	return fetchRadar(m.apiClient, m.radarCenterLat, m.radarCenterLon, m.radarZoom, displayWidth, displayHeight)
+	w, h := m.radarDisplaySize()
+	return fetchRadar(m.apiClient, m.radarCenterLat, m.radarCenterLon, m.radarZoom, w, h)
 }
 
 // radarPan pans the radar view by the given direction (dx, dy each -1, 0, or 1)
 func (m Model) radarPan(dx, dy int) (tea.Model, tea.Cmd) {
-	displayHeight := m.height - 10
-	if displayHeight < 10 {
-		displayHeight = 10
-	}
+	_, displayHeight := m.radarDisplaySize()
 	// Pan by 1/4 of the viewport in braille pixels
 	panH := float64(m.width) / 2.0            // charWidth * 2 / 4
 	panV := float64(displayHeight)             // charHeight * 4 / 4

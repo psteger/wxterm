@@ -97,10 +97,13 @@ func (tc *TileCache) Get(key string) (image.Image, bool) {
 	return img, ok
 }
 
-// Set stores a tile in the cache
+// Set stores a tile in the cache, evicting all entries if the cache is too large.
 func (tc *TileCache) Set(key string, img image.Image) {
 	tc.mu.Lock()
 	defer tc.mu.Unlock()
+	if len(tc.tiles) >= maxCacheEntries {
+		clear(tc.tiles)
+	}
 	tc.tiles[key] = img
 }
 
@@ -108,8 +111,46 @@ const (
 	osmTileURL        = "https://tile.openstreetmap.org/%d/%d/%d.png"
 	rainViewerMapsURL = "https://api.rainviewer.com/public/weather-maps.json"
 	tileSize          = 256
-	maxRainZoom       = 7 // RainViewer supports up to zoom 7
+	maxRainZoom       = 7   // RainViewer supports up to zoom 7
+	rainColorScheme   = 6   // NEXRAD Level III
+	rainOptions       = "1_1" // smooth + snow
+	maxCacheEntries   = 512 // evict all when exceeded
 )
+
+// tileGrid holds the computed tile range and composite dimensions for a viewport.
+type tileGrid struct {
+	minX, minY, maxX, maxY int
+	compW, compH           int
+	numTiles               int
+}
+
+// calcTileGrid determines which tiles cover the given pixel bounds at the specified zoom.
+func calcTileGrid(left, top, right, bottom float64, zoom int) tileGrid {
+	minX := int(math.Floor(left / float64(tileSize)))
+	minY := int(math.Floor(top / float64(tileSize)))
+	maxX := int(math.Floor((right - 1) / float64(tileSize)))
+	maxY := int(math.Floor((bottom - 1) / float64(tileSize)))
+
+	maxTile := (1 << zoom) - 1
+	if minY < 0 {
+		minY = 0
+	}
+	if maxY > maxTile {
+		maxY = maxTile
+	}
+
+	return tileGrid{
+		minX: minX, minY: minY, maxX: maxX, maxY: maxY,
+		compW:    (maxX - minX + 1) * tileSize,
+		compH:    (maxY - minY + 1) * tileSize,
+		numTiles: maxTile + 1,
+	}
+}
+
+// wrapTileX wraps a tile X coordinate into the valid range [0, numTiles).
+func wrapTileX(tx, numTiles int) int {
+	return ((tx % numTiles) + numTiles) % numTiles
+}
 
 // FetchRadar fetches map tiles and rain overlay data for the radar view
 func (c *Client) FetchRadar(lat, lon float64, zoom int, viewWidthChars, viewHeightChars int) (*RadarData, error) {
@@ -129,27 +170,10 @@ func (c *Client) FetchRadar(lat, lon float64, zoom int, viewWidthChars, viewHeig
 	bottom := centerPYf + float64(bpxHeight)/2
 
 	// Determine which tiles we need
-	tileMinX := int(math.Floor(left / float64(tileSize)))
-	tileMinY := int(math.Floor(top / float64(tileSize)))
-	tileMaxX := int(math.Floor((right - 1) / float64(tileSize)))
-	tileMaxY := int(math.Floor((bottom - 1) / float64(tileSize)))
-
-	// Clamp Y to valid range (latitude doesn't wrap)
-	maxTile := (1 << zoom) - 1
-	if tileMinY < 0 {
-		tileMinY = 0
-	}
-	if tileMaxY > maxTile {
-		tileMaxY = maxTile
-	}
-
-	cols := tileMaxX - tileMinX + 1
-	rows := tileMaxY - tileMinY + 1
-	compositeWidth := cols * tileSize
-	compositeHeight := rows * tileSize
+	grid := calcTileGrid(left, top, right, bottom, zoom)
 
 	// Create map composite with neutral background
-	mapComposite := image.NewRGBA(image.Rect(0, 0, compositeWidth, compositeHeight))
+	mapComposite := image.NewRGBA(image.Rect(0, 0, grid.compW, grid.compH))
 	draw.Draw(mapComposite, mapComposite.Bounds(),
 		&image.Uniform{color.RGBA{240, 238, 233, 255}}, image.Point{}, draw.Src)
 
@@ -157,15 +181,13 @@ func (c *Client) FetchRadar(lat, lon float64, zoom int, viewWidthChars, viewHeig
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	var firstErr error
-	numTiles := maxTile + 1
 
-	for ty := tileMinY; ty <= tileMaxY; ty++ {
-		for tx := tileMinX; tx <= tileMaxX; tx++ {
+	for ty := grid.minY; ty <= grid.maxY; ty++ {
+		for tx := grid.minX; tx <= grid.maxX; tx++ {
 			wg.Add(1)
 			go func(tx, ty int) {
 				defer wg.Done()
-				wrappedTX := ((tx % numTiles) + numTiles) % numTiles
-				img, err := c.fetchMapTile(zoom, wrappedTX, ty)
+				img, err := c.fetchMapTile(zoom, wrapTileX(tx, grid.numTiles), ty)
 				if err != nil {
 					mu.Lock()
 					if firstErr == nil {
@@ -174,8 +196,8 @@ func (c *Client) FetchRadar(lat, lon float64, zoom int, viewWidthChars, viewHeig
 					mu.Unlock()
 					return
 				}
-				destX := (tx - tileMinX) * tileSize
-				destY := (ty - tileMinY) * tileSize
+				destX := (tx - grid.minX) * tileSize
+				destY := (ty - grid.minY) * tileSize
 				mu.Lock()
 				draw.Draw(mapComposite,
 					image.Rect(destX, destY, destX+tileSize, destY+tileSize),
@@ -191,10 +213,8 @@ func (c *Client) FetchRadar(lat, lon float64, zoom int, viewWidthChars, viewHeig
 	}
 
 	// Calculate center pixel in composite coordinates
-	originPX := float64(tileMinX) * float64(tileSize)
-	originPY := float64(tileMinY) * float64(tileSize)
-	centerPX := int(centerPXf - originPX)
-	centerPY := int(centerPYf - originPY)
+	centerPX := int(centerPXf - float64(grid.minX)*float64(tileSize))
+	centerPY := int(centerPYf - float64(grid.minY)*float64(tileSize))
 
 	result := &RadarData{
 		MapImage:  mapComposite,
@@ -229,61 +249,30 @@ func (c *Client) FetchRadar(lat, lon float64, zoom int, viewWidthChars, viewHeig
 	needsUpscale := rainZoom < zoom
 
 	// Calculate rain tile grid (may differ from map tile grid at high zoom)
-	var rainTileMinX, rainTileMinY, rainTileMaxX, rainTileMaxY int
-	var rainCompW, rainCompH, rainNumTiles int
-
+	var rainGrid tileGrid
 	if !needsUpscale {
-		rainTileMinX = tileMinX
-		rainTileMinY = tileMinY
-		rainTileMaxX = tileMaxX
-		rainTileMaxY = tileMaxY
-		rainCompW = compositeWidth
-		rainCompH = compositeHeight
-		rainNumTiles = numTiles
+		rainGrid = grid
 	} else {
 		scaleFactor := math.Pow(2, float64(zoom-rainZoom))
-		rLeft := left / scaleFactor
-		rTop := top / scaleFactor
-		rRight := right / scaleFactor
-		rBottom := bottom / scaleFactor
-
-		rainTileMinX = int(math.Floor(rLeft / float64(tileSize)))
-		rainTileMinY = int(math.Floor(rTop / float64(tileSize)))
-		rainTileMaxX = int(math.Floor((rRight - 1) / float64(tileSize)))
-		rainTileMaxY = int(math.Floor((rBottom - 1) / float64(tileSize)))
-
-		rainMaxTile := (1 << rainZoom) - 1
-		rainNumTiles = rainMaxTile + 1
-		if rainTileMinY < 0 {
-			rainTileMinY = 0
-		}
-		if rainTileMaxY > rainMaxTile {
-			rainTileMaxY = rainMaxTile
-		}
-
-		rainCols := rainTileMaxX - rainTileMinX + 1
-		rainRows := rainTileMaxY - rainTileMinY + 1
-		rainCompW = rainCols * tileSize
-		rainCompH = rainRows * tileSize
+		rainGrid = calcTileGrid(left/scaleFactor, top/scaleFactor, right/scaleFactor, bottom/scaleFactor, rainZoom)
 	}
 
 	// Fetch rain tiles for each timestamp
 	for _, entry := range entries {
-		rainSmall := image.NewRGBA(image.Rect(0, 0, rainCompW, rainCompH))
+		rainSmall := image.NewRGBA(image.Rect(0, 0, rainGrid.compW, rainGrid.compH))
 
 		var rwg sync.WaitGroup
-		for ty := rainTileMinY; ty <= rainTileMaxY; ty++ {
-			for tx := rainTileMinX; tx <= rainTileMaxX; tx++ {
+		for ty := rainGrid.minY; ty <= rainGrid.maxY; ty++ {
+			for tx := rainGrid.minX; tx <= rainGrid.maxX; tx++ {
 				rwg.Add(1)
 				go func(tx, ty int) {
 					defer rwg.Done()
-					wrappedTX := ((tx % rainNumTiles) + rainNumTiles) % rainNumTiles
-					img, err := c.fetchRainTile(rainResp.Host, entry.Path, rainZoom, wrappedTX, ty)
+					img, err := c.fetchRainTile(rainResp.Host, entry.Path, rainZoom, wrapTileX(tx, rainGrid.numTiles), ty)
 					if err != nil {
 						return // Skip failed rain tiles
 					}
-					destX := (tx - rainTileMinX) * tileSize
-					destY := (ty - rainTileMinY) * tileSize
+					destX := (tx - rainGrid.minX) * tileSize
+					destY := (ty - rainGrid.minY) * tileSize
 					mu.Lock()
 					draw.Draw(rainSmall,
 						image.Rect(destX, destY, destX+tileSize, destY+tileSize),
@@ -296,9 +285,7 @@ func (c *Client) FetchRadar(lat, lon float64, zoom int, viewWidthChars, viewHeig
 
 		var rainFrame image.Image
 		if needsUpscale {
-			rainFrame = upscaleRainToMapSpace(rainSmall,
-				tileMinX, tileMinY, compositeWidth, compositeHeight,
-				rainTileMinX, rainTileMinY, zoom, rainZoom)
+			rainFrame = upscaleRainToMapSpace(rainSmall, grid, rainGrid, zoom, rainZoom)
 		} else {
 			rainFrame = rainSmall
 		}
@@ -314,29 +301,29 @@ func (c *Client) FetchRadar(lat, lon float64, zoom int, viewWidthChars, viewHeig
 
 // upscaleRainToMapSpace scales a rain composite fetched at rainZoom into the
 // pixel space of the map composite at mapZoom using nearest-neighbor interpolation.
-func upscaleRainToMapSpace(rain *image.RGBA,
-	mapTileMinX, mapTileMinY, mapW, mapH int,
-	rainTileMinX, rainTileMinY, mapZoom, rainZoom int,
-) *image.RGBA {
+func upscaleRainToMapSpace(rain *image.RGBA, mapGrid, rainGrid tileGrid, mapZoom, rainZoom int) *image.RGBA {
 	shift := uint(mapZoom - rainZoom)
-	out := image.NewRGBA(image.Rect(0, 0, mapW, mapH))
+	out := image.NewRGBA(image.Rect(0, 0, mapGrid.compW, mapGrid.compH))
 	rainW := rain.Bounds().Dx()
 	rainH := rain.Bounds().Dy()
-	rainBaseX := rainTileMinX * tileSize
-	rainBaseY := rainTileMinY * tileSize
+	rainBaseX := rainGrid.minX * tileSize
+	rainBaseY := rainGrid.minY * tileSize
 
-	for y := 0; y < mapH; y++ {
-		// Global pixel Y at mapZoom, then floor-divide to rainZoom pixel space
-		srcY := ((mapTileMinY*tileSize + y) >> shift) - rainBaseY
+	for y := 0; y < mapGrid.compH; y++ {
+		srcY := ((mapGrid.minY*tileSize + y) >> shift) - rainBaseY
 		if srcY < 0 || srcY >= rainH {
 			continue
 		}
-		for x := 0; x < mapW; x++ {
-			srcX := ((mapTileMinX*tileSize + x) >> shift) - rainBaseX
+		srcRowOff := srcY * rain.Stride
+		dstRowOff := y * out.Stride
+		for x := 0; x < mapGrid.compW; x++ {
+			srcX := ((mapGrid.minX*tileSize + x) >> shift) - rainBaseX
 			if srcX < 0 || srcX >= rainW {
 				continue
 			}
-			out.SetRGBA(x, y, rain.RGBAAt(srcX, srcY))
+			srcOff := srcRowOff + srcX*4
+			dstOff := dstRowOff + x*4
+			copy(out.Pix[dstOff:dstOff+4], rain.Pix[srcOff:srcOff+4])
 		}
 	}
 	return out
@@ -344,11 +331,30 @@ func upscaleRainToMapSpace(rain *image.RGBA,
 
 func (c *Client) fetchMapTile(zoom, x, y int) (image.Image, error) {
 	key := fmt.Sprintf("map/%d/%d/%d", zoom, x, y)
+	url := fmt.Sprintf(osmTileURL, zoom, x, y)
+	return c.fetchPNGTile(key, url)
+}
+
+func (c *Client) fetchRainViewerMaps() (*RainViewerResponse, error) {
+	var result RainViewerResponse
+	if err := c.get(rainViewerMapsURL, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+func (c *Client) fetchRainTile(host, path string, zoom, x, y int) (image.Image, error) {
+	key := fmt.Sprintf("rain/%s/%d/%d/%d", path, zoom, x, y)
+	url := fmt.Sprintf("%s%s/%d/%d/%d/%d/%d/%s.png", host, path, tileSize, zoom, x, y, rainColorScheme, rainOptions)
+	return c.fetchPNGTile(key, url)
+}
+
+// fetchPNGTile fetches a PNG tile image by URL with caching.
+func (c *Client) fetchPNGTile(key, url string) (image.Image, error) {
 	if img, ok := c.tileCache.Get(key); ok {
 		return img, nil
 	}
 
-	url := fmt.Sprintf(osmTileURL, zoom, x, y)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
@@ -362,44 +368,7 @@ func (c *Client) fetchMapTile(zoom, x, y int) (image.Image, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d for tile %d/%d/%d", resp.StatusCode, zoom, x, y)
-	}
-
-	img, err := png.Decode(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	c.tileCache.Set(key, img)
-	return img, nil
-}
-
-func (c *Client) fetchRainViewerMaps() (*RainViewerResponse, error) {
-	var result RainViewerResponse
-	if err := c.get(rainViewerMapsURL, &result); err != nil {
-		return nil, err
-	}
-	return &result, nil
-}
-
-func (c *Client) fetchRainTile(host, path string, zoom, x, y int) (image.Image, error) {
-	key := fmt.Sprintf("rain/%s/%d/%d/%d", path, zoom, x, y)
-	if img, ok := c.tileCache.Get(key); ok {
-		return img, nil
-	}
-
-	// RainViewer tile URL: {host}{path}/{size}/{z}/{x}/{y}/{color}/{options}.png
-	// color 6 = NEXRAD Level III, options 1_1 = smooth + snow
-	url := fmt.Sprintf("%s%s/%d/%d/%d/%d/6/1_1.png", host, path, tileSize, zoom, x, y)
-
-	resp, err := c.httpClient.Get(url)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d for rain tile", resp.StatusCode)
+		return nil, fmt.Errorf("HTTP %d for tile %s", resp.StatusCode, key)
 	}
 
 	img, err := png.Decode(resp.Body)
