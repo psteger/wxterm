@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"weatherterm/internal/api"
-	"weatherterm/internal/config"
-	"weatherterm/internal/location"
-	"weatherterm/internal/ui/components"
+	"wxterm/internal/api"
+	"wxterm/internal/config"
+	"wxterm/internal/location"
+	"wxterm/internal/ui/components"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -75,9 +75,9 @@ type Model struct {
 	useImperial bool
 
 	// Radar viewport and animation
-	radarZoom       int
-	radarCenterLat  float64
-	radarCenterLon  float64
+	radarZoom        int
+	radarCenterLat   float64
+	radarCenterLon   float64
 	radarFrameIndex  int
 	radarAnimating   bool
 	radarGeneration  int // Incremented when new radar data loads to invalidate old ticks
@@ -551,8 +551,8 @@ func (m Model) radarViewCmd() tea.Cmd {
 func (m Model) radarPan(dx, dy int) (tea.Model, tea.Cmd) {
 	_, displayHeight := m.radarDisplaySize()
 	// Pan by 1/4 of the viewport in braille pixels
-	panH := float64(m.width) / 2.0            // charWidth * 2 / 4
-	panV := float64(displayHeight)             // charHeight * 4 / 4
+	panH := float64(m.width) / 2.0 // charWidth * 2 / 4
+	panV := float64(displayHeight) // charHeight * 4 / 4
 	m.radarCenterLat, m.radarCenterLon = api.PanCenter(
 		m.radarCenterLat, m.radarCenterLon, m.radarZoom,
 		float64(dx)*panH, float64(dy)*panV)
@@ -620,7 +620,7 @@ func (m Model) View() string {
 }
 
 func (m Model) renderHeader() string {
-	title := titleStyle.Render("WeatherTerm")
+	title := titleStyle.Render("wxterm")
 	loc := ""
 	if m.location.IsValid() {
 		loc = locationStyle.Render(m.location.DisplayName())

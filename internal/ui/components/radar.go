@@ -5,7 +5,7 @@ import (
 	"image"
 	"strings"
 
-	"weatherterm/internal/api"
+	"wxterm/internal/api"
 
 	"github.com/charmbracelet/lipgloss"
 )

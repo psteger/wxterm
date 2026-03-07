@@ -3,7 +3,7 @@ package ui
 import (
 	"strings"
 
-	"weatherterm/internal/ui/components"
+	"wxterm/internal/ui/components"
 
 	"github.com/charmbracelet/lipgloss"
 )

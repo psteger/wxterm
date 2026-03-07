@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"weatherterm/internal/ui"
+	"wxterm/internal/ui"
 
 	tea "github.com/charmbracelet/bubbletea"
 )

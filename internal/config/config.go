@@ -5,10 +5,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"weatherterm/internal/location"
+	"wxterm/internal/location"
 )
 
-const configFileName = "weatherterm.json"
+const configFileName = "wxterm.json"
 
 // Config stores user preferences and saved locations
 type Config struct {
@@ -88,5 +88,5 @@ func getConfigPath() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(configDir, "weatherterm", configFileName), nil
+	return filepath.Join(configDir, "wxterm", configFileName), nil
 }

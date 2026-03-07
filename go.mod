@@ -1,4 +1,4 @@
-module weatherterm
+module wxterm
 
 go 1.25.1
 

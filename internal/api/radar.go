@@ -111,10 +111,10 @@ const (
 	osmTileURL        = "https://tile.openstreetmap.org/%d/%d/%d.png"
 	rainViewerMapsURL = "https://api.rainviewer.com/public/weather-maps.json"
 	tileSize          = 256
-	maxRainZoom       = 7   // RainViewer supports up to zoom 7
-	rainColorScheme   = 6   // NEXRAD Level III
+	maxRainZoom       = 7     // RainViewer supports up to zoom 7
+	rainColorScheme   = 6     // NEXRAD Level III
 	rainOptions       = "1_1" // smooth + snow
-	maxCacheEntries   = 512 // evict all when exceeded
+	maxCacheEntries   = 512   // evict all when exceeded
 )
 
 // tileGrid holds the computed tile range and composite dimensions for a viewport.
@@ -359,7 +359,7 @@ func (c *Client) fetchPNGTile(key, url string) (image.Image, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", "WeatherTerm/1.0 (terminal weather app)")
+	req.Header.Set("User-Agent", "wxterm/1.0 (terminal weather app)")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
