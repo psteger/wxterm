@@ -22,6 +22,55 @@ A terminal-based weather application built in Go. View current conditions, hourl
 - **No API Keys Required** — Uses free, open APIs (Open-Meteo, RainViewer, OpenStreetMap)
 - **Mouse Support** — Full mouse cell motion support via the Bubble Tea framework
 
+
+<details open>
+<summary>Screenshots</summary>
+<table>
+  <tr>
+    <td align="center">
+      <a href="https://raw.githubusercontent.com/psteger/wxterm-assets/refs/heads/main/1.png">
+        <img src="https://raw.githubusercontent.com/psteger/wxterm-assets/refs/heads/main/1.png" width="100%">
+      </a>
+      <br><em>Current Conditions</em>
+    </td>
+    <td align="center">
+      <a href="https://raw.githubusercontent.com/psteger/wxterm-assets/refs/heads/main/2.png">
+        <img src="https://raw.githubusercontent.com/psteger/wxterm-assets/refs/heads/main/2.png" width="100%">
+      </a>
+      <br><em>Hourly Forecast</em>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <a href="https://raw.githubusercontent.com/psteger/wxterm-assets/refs/heads/main/3.png">
+        <img src="https://raw.githubusercontent.com/psteger/wxterm-assets/refs/heads/main/3.png" width="100%">
+      </a>
+      <br><em>Daily Forecast</em>
+    </td>
+    <td align="center">
+      <a href="https://raw.githubusercontent.com/psteger/wxterm-assets/refs/heads/main/4.png">
+        <img src="https://raw.githubusercontent.com/psteger/wxterm-assets/refs/heads/main/4.png" width="100%">
+      </a>
+      <br><em>Local Radar</em>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <a href="https://raw.githubusercontent.com/psteger/wxterm-assets/refs/heads/main/5.png">
+        <img src="https://raw.githubusercontent.com/psteger/wxterm-assets/refs/heads/main/5.png" width="100%">
+      </a>
+      <br><em>Regional Radar</em>
+    </td>
+    <td align="center">
+      <a href="https://raw.githubusercontent.com/psteger/wxterm-assets/refs/heads/main/6.png">
+        <img src="https://raw.githubusercontent.com/psteger/wxterm-assets/refs/heads/main/6.png" width="100%">
+      </a>
+      <br><em>Storm Detail</em>
+    </td>
+  </tr>
+</table>
+</details>
+
 ## Installation
 
 ### Prerequisites
