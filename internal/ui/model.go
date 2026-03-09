@@ -163,6 +163,14 @@ func NewModel() Model {
 
 // Init initializes the model
 func (m Model) Init() tea.Cmd {
+	// Use saved default location if available, otherwise detect via IP
+	if m.config != nil && m.config.DefaultLocation != nil && m.config.DefaultLocation.IsValid() {
+		loc := *m.config.DefaultLocation
+		return tea.Batch(
+			m.spinner.Tick,
+			func() tea.Msg { return locationDetectedMsg{loc} },
+		)
+	}
 	return tea.Batch(
 		m.spinner.Tick,
 		detectLocation(),
@@ -278,6 +286,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+s":
 			if m.location.IsValid() && m.config != nil {
 				m.config.AddSavedLocation(m.location)
+				m.config.SetDefaultLocation(m.location)
 				m.config.Save()
 			}
 		case "?":
