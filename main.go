@@ -9,6 +9,13 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+// Set by GoReleaser via ldflags.
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
+
 func main() {
 	p := tea.NewProgram(
 		ui.NewModel(),
