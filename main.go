@@ -18,7 +18,7 @@ var (
 
 func main() {
 	p := tea.NewProgram(
-		ui.NewModel(),
+		ui.NewModel(version),
 		tea.WithAltScreen(),
 		tea.WithMouseCellMotion(),
 	)

@@ -2,6 +2,9 @@ package ui
 
 import (
 	"fmt"
+	"net/http"
+	"os/exec"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -74,6 +77,10 @@ type Model struct {
 	// Units
 	useImperial bool
 
+	// Version
+	version       string
+	latestVersion string
+
 	// Radar viewport and animation
 	radarZoom        int
 	radarCenterLat   float64
@@ -109,6 +116,10 @@ type radarTickMsg struct {
 	generation int // Which radar generation this tick belongs to
 }
 
+type updateAvailableMsg struct {
+	version string
+}
+
 // radarTick returns a command that ticks the radar animation
 func radarTick(generation int) tea.Cmd {
 	return tea.Tick(500*time.Millisecond, func(t time.Time) tea.Msg {
@@ -117,7 +128,7 @@ func radarTick(generation int) tea.Cmd {
 }
 
 // NewModel creates a new Model with default values
-func NewModel() Model {
+func NewModel(version string) Model {
 	ti := textinput.New()
 	ti.Placeholder = "Search city..."
 	ti.CharLimit = 100
@@ -156,6 +167,7 @@ func NewModel() Model {
 		keys:           DefaultKeyMap(),
 		config:         cfg,
 		useImperial:    useImperial,
+		version:        version,
 		radarAnimating: true, // Start with animation enabled
 		radarZoom:      6,
 	}
@@ -169,11 +181,13 @@ func (m Model) Init() tea.Cmd {
 		return tea.Batch(
 			m.spinner.Tick,
 			func() tea.Msg { return locationDetectedMsg{loc} },
+			checkForUpdate(m.version),
 		)
 	}
 	return tea.Batch(
 		m.spinner.Tick,
 		detectLocation(),
+		checkForUpdate(m.version),
 	)
 }
 
@@ -311,6 +325,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.activeView == ViewRadar {
 				m.radarLegendIndex = (m.radarLegendIndex + 1) % components.NumRadarLegends()
 			}
+		case "d":
+			if m.latestVersion != "" {
+				return m, openBrowser("https://github.com/psteger/wxterm/releases/latest")
+			}
 		}
 
 	case weatherLoadedMsg:
@@ -353,6 +371,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
 		cmds = append(cmds, cmd)
+
+	case updateAvailableMsg:
+		m.latestVersion = msg.version
+		return m, nil
 
 	case radarTickMsg:
 		// Advance radar animation frame, but only if this tick is from the current generation
@@ -585,6 +607,53 @@ func (m Model) ensureRadarView() (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func checkForUpdate(currentVersion string) tea.Cmd {
+	return func() tea.Msg {
+		if currentVersion == "dev" {
+			return nil
+		}
+		client := &http.Client{
+			Timeout: 5 * time.Second,
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		}
+		resp, err := client.Get("https://github.com/psteger/wxterm/releases/latest")
+		if err != nil {
+			return nil
+		}
+		defer resp.Body.Close()
+
+		loc := resp.Header.Get("Location")
+		if loc == "" {
+			return nil
+		}
+		parts := strings.Split(loc, "/")
+		latestVersion := parts[len(parts)-1]
+
+		if latestVersion != "" && latestVersion != "v"+currentVersion {
+			return updateAvailableMsg{version: latestVersion}
+		}
+		return nil
+	}
+}
+
+func openBrowser(url string) tea.Cmd {
+	return func() tea.Msg {
+		var cmd *exec.Cmd
+		switch runtime.GOOS {
+		case "windows":
+			cmd = exec.Command("cmd", "/c", "start", url)
+		case "darwin":
+			cmd = exec.Command("open", url)
+		default:
+			cmd = exec.Command("xdg-open", url)
+		}
+		_ = cmd.Run()
+		return nil
+	}
+}
+
 func searchLocation(client *api.Client, query string) tea.Cmd {
 	return func() tea.Msg {
 		results, err := client.SearchLocation(query)
@@ -630,6 +699,7 @@ func (m Model) View() string {
 
 func (m Model) renderHeader() string {
 	title := titleStyle.Render("wxterm")
+	ver := versionStyle.Render("v" + m.version)
 	loc := ""
 	if m.location.IsValid() {
 		loc = locationStyle.Render(m.location.DisplayName())
@@ -640,9 +710,21 @@ func (m Model) renderHeader() string {
 	header := lipgloss.JoinHorizontal(
 		lipgloss.Top,
 		title,
+		" ",
+		ver,
 		"  ",
 		loc,
 	)
+
+	if m.latestVersion != "" {
+		notice := updateStyle.Render(fmt.Sprintf("New version %s is ready to download, press d to download", m.latestVersion))
+		header = lipgloss.JoinHorizontal(
+			lipgloss.Top,
+			header,
+			"  ",
+			notice,
+		)
+	}
 
 	return lipgloss.JoinVertical(
 		lipgloss.Left,

@@ -35,9 +35,15 @@ type HourlyForecast struct {
 	FeelsLike     []float64
 	Humidity      []int
 	WeatherCode   []int
-	WindSpeed     []float64
-	Precipitation []float64
-	CloudCover    []int
+	WindSpeed          []float64
+	WindDirection      []int
+	WindGusts          []float64
+	Precipitation      []float64
+	PrecipitationProb  []int
+	CloudCover         []int
+	UVIndex            []float64
+	Visibility         []float64
+	SurfacePressure    []float64
 }
 
 // DailyForecast contains 7-day forecast data
@@ -47,8 +53,13 @@ type DailyForecast struct {
 	TemperatureMax    []float64
 	TemperatureMin    []float64
 	PrecipitationProb []int
+	PrecipitationSum  []float64
+	PrecipTiming      []string
 	WindSpeedMax      []float64
 	WindSpeedMean     []float64
+	WindGustsMax      []float64
+	UVIndexMax        []float64
+	DaylightDuration  []float64
 	Sunrise           []time.Time
 	Sunset            []time.Time
 }

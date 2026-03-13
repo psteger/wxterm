@@ -66,19 +66,25 @@ func RenderDailyForecast(weather *api.WeatherData, width int, useImperial bool) 
 	// Header
 	header := lipgloss.JoinHorizontal(
 		lipgloss.Top,
+		lipgloss.NewStyle().Width(1).Render(""),
 		dayNameStyle.Render("Day"),
 		dayDateStyle.Render("Date"),
 		lipgloss.NewStyle().Width(7).Render(""),
 		lipgloss.NewStyle().Width(6).Render("High"),
 		lipgloss.NewStyle().Width(6).Render("Low"),
 		lipgloss.NewStyle().Width(8).Render("Precip"),
+		lipgloss.NewStyle().Width(7).Render("Rain"),
+		lipgloss.NewStyle().Width(10).Render("When"),
 		lipgloss.NewStyle().Width(8).Render("Avg Wind"),
 		lipgloss.NewStyle().Width(8).Render("Max Wind"),
+		lipgloss.NewStyle().Width(8).Render("Gusts"),
+		lipgloss.NewStyle().Width(4).Render("UV"),
+		lipgloss.NewStyle().Width(7).Render("Daylgt"),
 		dayConditionStyle.Render("Condition"),
 	)
 	b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#6B7280")).Render(header))
 	b.WriteString("\n")
-	b.WriteString(strings.Repeat("─", min(width-4, 75)))
+	b.WriteString(strings.Repeat("─", min(width-4, 110)))
 	b.WriteString("\n")
 
 	// Days
@@ -98,18 +104,50 @@ func RenderDailyForecast(weather *api.WeatherData, width int, useImperial bool) 
 		precip := fmt.Sprintf("%d%%", daily.PrecipitationProb[i])
 		condition := api.WeatherCodeDescription(daily.WeatherCode[i])
 
+		// Precipitation sum
+		precipSum := daily.PrecipitationSum[i]
+		var rainStr string
+		if useImperial {
+			rainStr = fmt.Sprintf("%.2f\"", precipSum/25.4)
+		} else {
+			rainStr = fmt.Sprintf("%.1fmm", precipSum)
+		}
+
 		windUnit := "km/h"
 		if useImperial {
 			windUnit = "mph"
 		}
 		avgWind := daily.WindSpeedMean[i]
 		maxWind := daily.WindSpeedMax[i]
+		gustWind := daily.WindGustsMax[i]
 		if useImperial {
 			avgWind = avgWind * 0.621371
 			maxWind = maxWind * 0.621371
+			gustWind = gustWind * 0.621371
 		}
 		avgWindStr := fmt.Sprintf("%.0f %s", avgWind, windUnit)
 		maxWindStr := fmt.Sprintf("%.0f %s", maxWind, windUnit)
+		gustStr := fmt.Sprintf("%.0f %s", gustWind, windUnit)
+
+		// UV index
+		uvStr := fmt.Sprintf("%.0f", daily.UVIndexMax[i])
+		uvStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#9CA3AF"))
+		if daily.UVIndexMax[i] >= 8 {
+			uvStyle = uvStyle.Foreground(lipgloss.Color("#EF4444"))
+		} else if daily.UVIndexMax[i] >= 6 {
+			uvStyle = uvStyle.Foreground(lipgloss.Color("#F97316"))
+		} else if daily.UVIndexMax[i] >= 3 {
+			uvStyle = uvStyle.Foreground(lipgloss.Color("#F59E0B"))
+		}
+
+		// Daylight duration (seconds -> HH:MM)
+		daylightSecs := daily.DaylightDuration[i]
+		daylightHours := int(daylightSecs) / 3600
+		daylightMins := (int(daylightSecs) % 3600) / 60
+		daylightStr := fmt.Sprintf("%d:%02d", daylightHours, daylightMins)
+
+		// Precipitation timing
+		timing := daily.PrecipTiming[i]
 
 		row := lipgloss.JoinHorizontal(
 			lipgloss.Top,
@@ -119,8 +157,13 @@ func RenderDailyForecast(weather *api.WeatherData, width int, useImperial bool) 
 			getTempStyle(daily.TemperatureMax[i]).Width(6).Render(highTemp),
 			getTempStyle(daily.TemperatureMin[i]).Width(6).Render(lowTemp),
 			dayPrecipStyle.Render(precip),
+			lipgloss.NewStyle().Width(7).Foreground(lipgloss.Color("#60A5FA")).Render(rainStr),
+			lipgloss.NewStyle().Width(10).Foreground(lipgloss.Color("#60A5FA")).Render(timing),
 			dayWindStyle.Render(avgWindStr),
 			dayWindStyle.Render(maxWindStr),
+			dayWindStyle.Render(gustStr),
+			uvStyle.Width(4).Render(uvStr),
+			lipgloss.NewStyle().Width(7).Foreground(lipgloss.Color("#9CA3AF")).Render(daylightStr),
 			dayConditionStyle.Render(condition),
 		)
 

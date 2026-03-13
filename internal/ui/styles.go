@@ -72,6 +72,14 @@ var (
 	locationStyle = lipgloss.NewStyle().
 			Foreground(secondaryColor).
 			Bold(true)
+
+	// Version style
+	versionStyle = lipgloss.NewStyle().
+			Foreground(mutedColor)
+
+	// Update notice style
+	updateStyle = lipgloss.NewStyle().
+			Foreground(accentColor)
 )
 
 // TempColor returns an appropriate style based on temperature
