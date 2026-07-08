@@ -5,7 +5,7 @@ A terminal-based weather application built in Go. View current conditions, hourl
 > **Personal Note:** This project began as one of my first from-scratch builds using Claude and has been a personal idea I’ve wanted to explore for quite some time. The map renderer milestone is now complete: the radar base map is rendered from vector tiles using a Go port of the approach in [mapscii](https://github.com/rastapasta/mapscii/), replacing the original raster-tile renderer.
 
 
-![Go](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go&logoColor=white)
+![Go](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
 
@@ -75,7 +75,7 @@ A terminal-based weather application built in Go. View current conditions, hourl
 
 ### Prerequisites
 
-- [Go](https://go.dev/dl/) 1.25 or later
+- [Go](https://go.dev/dl/) 1.26 or later
 - A terminal emulator with Unicode and 256-color support (most modern terminals work)
 
 ### Build from Source
