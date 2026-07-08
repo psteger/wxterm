@@ -14,36 +14,36 @@ type WeatherData struct {
 
 // CurrentWeather represents current conditions
 type CurrentWeather struct {
-	Time             time.Time
-	Temperature      float64
-	FeelsLike        float64
-	Humidity         int
-	WindSpeed        float64
-	WindDirection    int
-	WeatherCode      int
-	IsDay            bool
-	Precipitation    float64
-	CloudCover       int
-	Pressure         float64
-	Visibility       float64
+	Time          time.Time
+	Temperature   float64
+	FeelsLike     float64
+	Humidity      int
+	WindSpeed     float64
+	WindDirection int
+	WeatherCode   int
+	IsDay         bool
+	Precipitation float64
+	CloudCover    int
+	Pressure      float64
+	Visibility    float64
 }
 
 // HourlyForecast contains 24-hour forecast data
 type HourlyForecast struct {
-	Time          []time.Time
-	Temperature   []float64
-	FeelsLike     []float64
-	Humidity      []int
-	WeatherCode   []int
-	WindSpeed          []float64
-	WindDirection      []int
-	WindGusts          []float64
-	Precipitation      []float64
-	PrecipitationProb  []int
-	CloudCover         []int
-	UVIndex            []float64
-	Visibility         []float64
-	SurfacePressure    []float64
+	Time              []time.Time
+	Temperature       []float64
+	FeelsLike         []float64
+	Humidity          []int
+	WeatherCode       []int
+	WindSpeed         []float64
+	WindDirection     []int
+	WindGusts         []float64
+	Precipitation     []float64
+	PrecipitationProb []int
+	CloudCover        []int
+	UVIndex           []float64
+	Visibility        []float64
+	SurfacePressure   []float64
 }
 
 // DailyForecast contains 7-day forecast data

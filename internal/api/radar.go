@@ -3,13 +3,14 @@ package api
 import (
 	"fmt"
 	"image"
-	"image/color"
 	"image/draw"
 	"image/png"
 	"math"
 	"net/http"
 	"sync"
 	"time"
+
+	"wxterm/internal/vmap"
 )
 
 // Ensure png format is available
@@ -43,14 +44,14 @@ func PanCenter(lat, lon float64, zoom int, dxPixels, dyPixels float64) (newLat, 
 
 // RadarData holds the map and rain data for the radar view
 type RadarData struct {
-	MapImage   image.Image // Composited map tiles
-	RainFrames []RainFrame // Rain overlay frames for animation
+	VMap       *vmap.TileSet // Vector map tiles (mapscii-style rendering)
+	RainFrames []RainFrame   // Rain overlay frames for animation
 
 	CenterLat float64
 	CenterLon float64
 	ZoomLevel int
 
-	// Center pixel position within MapImage
+	// Center pixel position within the rain composite images
 	CenterPX int
 	CenterPY int
 }
@@ -108,7 +109,6 @@ func (tc *TileCache) Set(key string, img image.Image) {
 }
 
 const (
-	osmTileURL        = "https://tile.openstreetmap.org/%d/%d/%d.png"
 	rainViewerMapsURL = "https://api.rainviewer.com/public/weather-maps.json"
 	tileSize          = 256
 	maxRainZoom       = 7     // RainViewer supports up to zoom 7
@@ -169,61 +169,33 @@ func (c *Client) FetchRadar(lat, lon float64, zoom int, viewWidthChars, viewHeig
 	right := centerPXf + float64(bpxWidth)/2
 	bottom := centerPYf + float64(bpxHeight)/2
 
-	// Determine which tiles we need
+	// Determine which tiles the rain composite needs
 	grid := calcTileGrid(left, top, right, bottom, zoom)
 
-	// Create map composite with neutral background
-	mapComposite := image.NewRGBA(image.Rect(0, 0, grid.compW, grid.compH))
-	draw.Draw(mapComposite, mapComposite.Bounds(),
-		&image.Uniform{color.RGBA{240, 238, 233, 255}}, image.Point{}, draw.Src)
-
-	// Fetch map tiles in parallel
-	var wg sync.WaitGroup
-	var mu sync.Mutex
-	var firstErr error
-
-	for ty := grid.minY; ty <= grid.maxY; ty++ {
-		for tx := grid.minX; tx <= grid.maxX; tx++ {
-			wg.Add(1)
-			go func(tx, ty int) {
-				defer wg.Done()
-				img, err := c.fetchMapTile(zoom, wrapTileX(tx, grid.numTiles), ty)
-				if err != nil {
-					mu.Lock()
-					if firstErr == nil {
-						firstErr = err
-					}
-					mu.Unlock()
-					return
-				}
-				destX := (tx - grid.minX) * tileSize
-				destY := (ty - grid.minY) * tileSize
-				mu.Lock()
-				draw.Draw(mapComposite,
-					image.Rect(destX, destY, destX+tileSize, destY+tileSize),
-					img, img.Bounds().Min, draw.Src)
-				mu.Unlock()
-			}(tx, ty)
-		}
+	// Fetch the vector map tiles (mapscii-style base map)
+	renderer, err := vmap.Default()
+	if err != nil {
+		return nil, fmt.Errorf("vector map renderer: %w", err)
 	}
-	wg.Wait()
-
-	if firstErr != nil {
-		return nil, fmt.Errorf("failed to fetch map tiles: %w", firstErr)
+	tileSet, err := renderer.FetchTiles(lat, lon, zoom)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch vector tiles: %w", err)
 	}
 
-	// Calculate center pixel in composite coordinates
+	// Calculate center pixel in rain-composite coordinates
 	centerPX := int(centerPXf - float64(grid.minX)*float64(tileSize))
 	centerPY := int(centerPYf - float64(grid.minY)*float64(tileSize))
 
 	result := &RadarData{
-		MapImage:  mapComposite,
+		VMap:      tileSet,
 		CenterLat: lat,
 		CenterLon: lon,
 		ZoomLevel: zoom,
 		CenterPX:  centerPX,
 		CenterPY:  centerPY,
 	}
+
+	var mu sync.Mutex
 
 	// Fetch RainViewer data (non-fatal if it fails)
 	rainResp, err := c.fetchRainViewerMaps()
@@ -327,12 +299,6 @@ func upscaleRainToMapSpace(rain *image.RGBA, mapGrid, rainGrid tileGrid, mapZoom
 		}
 	}
 	return out
-}
-
-func (c *Client) fetchMapTile(zoom, x, y int) (image.Image, error) {
-	key := fmt.Sprintf("map/%d/%d/%d", zoom, x, y)
-	url := fmt.Sprintf(osmTileURL, zoom, x, y)
-	return c.fetchPNGTile(key, url)
 }
 
 func (c *Client) fetchRainViewerMaps() (*RainViewerResponse, error) {

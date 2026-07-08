@@ -24,6 +24,7 @@ func Load() (*Config, error) {
 		return &Config{}, nil
 	}
 
+	// #nosec G304 -- path is os.UserConfigDir() plus fixed names; no user input
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -49,7 +50,7 @@ func (c *Config) Save() error {
 
 	// Ensure directory exists
 	dir := filepath.Dir(configPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0750); err != nil {
 		return err
 	}
 
@@ -58,7 +59,7 @@ func (c *Config) Save() error {
 		return err
 	}
 
-	return os.WriteFile(configPath, data, 0644)
+	return os.WriteFile(configPath, data, 0600)
 }
 
 // AddSavedLocation adds a location to saved locations if not already present

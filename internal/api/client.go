@@ -8,9 +8,9 @@ import (
 )
 
 const (
-	weatherBaseURL    = "https://api.open-meteo.com/v1/forecast"
-	geocodingBaseURL  = "https://geocoding-api.open-meteo.com/v1/search"
-	defaultTimeout    = 10 * time.Second
+	weatherBaseURL   = "https://api.open-meteo.com/v1/forecast"
+	geocodingBaseURL = "https://geocoding-api.open-meteo.com/v1/search"
+	defaultTimeout   = 10 * time.Second
 )
 
 // Client handles API requests to Open-Meteo

@@ -6,21 +6,21 @@ import (
 
 // KeyMap defines all keybindings
 type KeyMap struct {
-	NextView    key.Binding
-	PrevView    key.Binding
-	View1       key.Binding
-	View2       key.Binding
-	View3       key.Binding
-	Search      key.Binding
-	Location    key.Binding
-	Refresh     key.Binding
-	Save        key.Binding
-	Help        key.Binding
-	Quit        key.Binding
-	Enter       key.Binding
-	Escape      key.Binding
-	Up          key.Binding
-	Down        key.Binding
+	NextView key.Binding
+	PrevView key.Binding
+	View1    key.Binding
+	View2    key.Binding
+	View3    key.Binding
+	Search   key.Binding
+	Location key.Binding
+	Refresh  key.Binding
+	Save     key.Binding
+	Help     key.Binding
+	Quit     key.Binding
+	Enter    key.Binding
+	Escape   key.Binding
+	Up       key.Binding
+	Down     key.Binding
 }
 
 // DefaultKeyMap returns the default keybindings
