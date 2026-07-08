@@ -12,8 +12,6 @@ var (
 	mutedColor     = lipgloss.Color("#6B7280")
 	successColor   = lipgloss.Color("#10B981")
 	errorColor     = lipgloss.Color("#EF4444")
-	warmColor      = lipgloss.Color("#F97316")
-	coldColor      = lipgloss.Color("#3B82F6")
 
 	// Base styles
 	titleStyle = lipgloss.NewStyle().
@@ -26,19 +24,6 @@ var (
 
 	mutedStyle = lipgloss.NewStyle().
 			Foreground(mutedColor)
-
-	// Temperature styles
-	tempStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("#FFFFFF"))
-
-	warmTempStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(warmColor)
-
-	coldTempStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(coldColor)
 
 	// Tab styles
 	activeTabStyle = lipgloss.NewStyle().
@@ -81,15 +66,3 @@ var (
 	updateStyle = lipgloss.NewStyle().
 			Foreground(accentColor)
 )
-
-// TempColor returns an appropriate style based on temperature
-func TempColor(temp float64) lipgloss.Style {
-	switch {
-	case temp >= 30:
-		return warmTempStyle
-	case temp <= 5:
-		return coldTempStyle
-	default:
-		return tempStyle
-	}
-}

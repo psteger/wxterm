@@ -27,12 +27,12 @@ type openMeteoResponse struct {
 		Visibility          float64 `json:"visibility"`
 	} `json:"current"`
 	Hourly struct {
-		Time                []string  `json:"time"`
-		Temperature2m       []float64 `json:"temperature_2m"`
-		ApparentTemperature []float64 `json:"apparent_temperature"`
-		RelativeHumidity2m  []int     `json:"relative_humidity_2m"`
-		WeatherCode         []int     `json:"weather_code"`
-		WindSpeed10m        []float64 `json:"wind_speed_10m"`
+		Time                     []string  `json:"time"`
+		Temperature2m            []float64 `json:"temperature_2m"`
+		ApparentTemperature      []float64 `json:"apparent_temperature"`
+		RelativeHumidity2m       []int     `json:"relative_humidity_2m"`
+		WeatherCode              []int     `json:"weather_code"`
+		WindSpeed10m             []float64 `json:"wind_speed_10m"`
 		Precipitation            []float64 `json:"precipitation"`
 		PrecipitationProbability []int     `json:"precipitation_probability"`
 		CloudCover               []int     `json:"cloud_cover"`
@@ -50,13 +50,13 @@ type openMeteoResponse struct {
 		PrecipitationProbMax []int     `json:"precipitation_probability_max"`
 		WindSpeed10mMax      []float64 `json:"wind_speed_10m_max"`
 		WindSpeed10mMean     []float64 `json:"wind_speed_10m_mean"`
-		PrecipitationSum   []float64 `json:"precipitation_sum"`
-		UVIndexMax         []float64 `json:"uv_index_max"`
-		WindGusts10mMax    []float64 `json:"wind_gusts_10m_max"`
-		DaylightDuration   []float64 `json:"daylight_duration"`
-		PrecipitationHours []float64 `json:"precipitation_hours"`
-		Sunrise            []string  `json:"sunrise"`
-		Sunset             []string  `json:"sunset"`
+		PrecipitationSum     []float64 `json:"precipitation_sum"`
+		UVIndexMax           []float64 `json:"uv_index_max"`
+		WindGusts10mMax      []float64 `json:"wind_gusts_10m_max"`
+		DaylightDuration     []float64 `json:"daylight_duration"`
+		PrecipitationHours   []float64 `json:"precipitation_hours"`
+		Sunrise              []string  `json:"sunrise"`
+		Sunset               []string  `json:"sunset"`
 	} `json:"daily"`
 }
 
@@ -124,14 +124,14 @@ func parseWeatherResponse(resp *openMeteoResponse) (*WeatherData, error) {
 
 	hourlyLen := min(24, len(resp.Hourly.Time)-startIdx)
 	data.Hourly = HourlyForecast{
-		Time:          make([]time.Time, hourlyLen),
-		Temperature:   make([]float64, hourlyLen),
-		FeelsLike:     make([]float64, hourlyLen),
-		Humidity:      make([]int, hourlyLen),
-		WeatherCode:   make([]int, hourlyLen),
-		WindSpeed:          make([]float64, hourlyLen),
-		WindDirection:      make([]int, hourlyLen),
-		WindGusts:          make([]float64, hourlyLen),
+		Time:              make([]time.Time, hourlyLen),
+		Temperature:       make([]float64, hourlyLen),
+		FeelsLike:         make([]float64, hourlyLen),
+		Humidity:          make([]int, hourlyLen),
+		WeatherCode:       make([]int, hourlyLen),
+		WindSpeed:         make([]float64, hourlyLen),
+		WindDirection:     make([]int, hourlyLen),
+		WindGusts:         make([]float64, hourlyLen),
 		Precipitation:     make([]float64, hourlyLen),
 		PrecipitationProb: make([]int, hourlyLen),
 		CloudCover:        make([]int, hourlyLen),

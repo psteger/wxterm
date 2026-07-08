@@ -301,7 +301,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.location.IsValid() && m.config != nil {
 				m.config.AddSavedLocation(m.location)
 				m.config.SetDefaultLocation(m.location)
-				m.config.Save()
+				if err := m.config.Save(); err != nil {
+					m.err = err
+				}
 			}
 		case "?":
 			m.mode = ModeHelp
@@ -309,7 +311,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.useImperial = !m.useImperial
 			if m.config != nil {
 				m.config.UseFahrenheit = m.useImperial
-				m.config.Save()
+				if err := m.config.Save(); err != nil {
+					m.err = err
+				}
 			}
 		case " ":
 			// Toggle radar animation pause/play
@@ -511,7 +515,9 @@ func (m Model) handleSavedLocationsMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "d":
 		if m.config != nil && m.selectedIndex < len(m.config.SavedLocations) {
 			m.config.RemoveSavedLocation(m.selectedIndex)
-			m.config.Save()
+			if err := m.config.Save(); err != nil {
+				m.err = err
+			}
 			if m.selectedIndex >= len(m.config.SavedLocations) && m.selectedIndex > 0 {
 				m.selectedIndex--
 			}
@@ -640,14 +646,19 @@ func checkForUpdate(currentVersion string) tea.Cmd {
 
 func openBrowser(url string) tea.Cmd {
 	return func() tea.Msg {
+		// Only ever called with a fixed https URL; guard keeps it that way
+		// so the shell/opener below never sees anything else.
+		if !strings.HasPrefix(url, "https://") {
+			return nil
+		}
 		var cmd *exec.Cmd
 		switch runtime.GOOS {
 		case "windows":
-			cmd = exec.Command("cmd", "/c", "start", url)
+			cmd = exec.Command("cmd", "/c", "start", url) // #nosec G204 -- fixed opener, url restricted to https above
 		case "darwin":
-			cmd = exec.Command("open", url)
+			cmd = exec.Command("open", url) // #nosec G204 -- fixed opener, url restricted to https above
 		default:
-			cmd = exec.Command("xdg-open", url)
+			cmd = exec.Command("xdg-open", url) // #nosec G204 -- fixed opener, url restricted to https above
 		}
 		_ = cmd.Run()
 		return nil

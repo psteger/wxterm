@@ -7,12 +7,12 @@ import (
 
 func TestLatLonToTileXY(t *testing.T) {
 	tests := []struct {
-		name       string
-		lat, lon   float64
-		zoom       int
-		wantX      float64
-		wantY      float64
-		tolerance  float64
+		name      string
+		lat, lon  float64
+		zoom      int
+		wantX     float64
+		wantY     float64
+		tolerance float64
 	}{
 		{"Origin at zoom 0", 0, 0, 0, 0.5, 0.5, 0.01},
 		{"NYC at zoom 5", 40.7128, -74.006, 5, 9.49, 12.07, 0.1},

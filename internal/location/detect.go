@@ -11,13 +11,13 @@ const ipAPIURL = "http://ip-api.com/json/"
 
 // ipAPIResponse represents the response from ip-api.com
 type ipAPIResponse struct {
-	Status      string  `json:"status"`
-	City        string  `json:"city"`
-	RegionName  string  `json:"regionName"`
-	Country     string  `json:"country"`
-	Latitude    float64 `json:"lat"`
-	Longitude   float64 `json:"lon"`
-	Message     string  `json:"message,omitempty"`
+	Status     string  `json:"status"`
+	City       string  `json:"city"`
+	RegionName string  `json:"regionName"`
+	Country    string  `json:"country"`
+	Latitude   float64 `json:"lat"`
+	Longitude  float64 `json:"lon"`
+	Message    string  `json:"message,omitempty"`
 }
 
 // DetectFromIP attempts to detect location from IP address

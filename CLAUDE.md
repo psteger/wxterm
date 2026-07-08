@@ -28,7 +28,6 @@ wxterm is a terminal-based weather application built with the Bubble Tea TUI fra
 - `internal/ui/` - TUI layer: model, views, keys, styles
 - `internal/api/` - HTTP clients for Open-Meteo (weather + geocoding) and RainViewer (radar tiles)
 - `internal/ui/components/` - View renderers for each tab (current, hourly, daily, radar, location)
-- `internal/geo/` - Static geographic data (world borders/coastlines, major cities) for radar overlay
 - `internal/location/` - Location types and IP-based geolocation via ip-api.com
 - `internal/config/` - User preferences stored in `~/.config/wxterm/wxterm.json`
 
