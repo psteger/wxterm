@@ -2,7 +2,7 @@
 
 A terminal-based weather application built in Go. View current conditions, hourly and daily forecasts, and animated precipitation radar — all from your terminal.
 
-> **Personal Note:** This project began as one of my first from-scratch builds using Claude and has been a personal idea I’ve wanted to explore for quite some time. While the current state is functional, I do not yet consider it fully complete—this initial commit should be viewed as roughly **v0.99**. The next milestone is to implement an improved map renderer with a look and feel closer to the approach used in [mapscii](https://github.com/rastapasta/mapscii/).
+> **Personal Note:** This project began as one of my first from-scratch builds using Claude and has been a personal idea I’ve wanted to explore for quite some time. The map renderer milestone is now complete: the radar base map is rendered from vector tiles using a Go port of the approach in [mapscii](https://github.com/rastapasta/mapscii/), replacing the original raster-tile renderer.
 
 
 ![Go](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go&logoColor=white)
@@ -14,12 +14,12 @@ A terminal-based weather application built in Go. View current conditions, hourl
 - **Current Weather** — Temperature, "feels like", humidity, wind, pressure, cloud cover, precipitation, visibility, and sunrise/sunset times with ASCII-art weather icons
 - **Hourly Forecast** — 24-hour forecast table with temperature, humidity, wind speed, and precipitation
 - **Daily Forecast** — 7-day outlook with high/low temps, precipitation probability, and wind speeds
-- **Animated Radar** — Live precipitation radar rendered with Unicode Braille characters, featuring pan, zoom, and animation playback controls
+- **Animated Radar** — Live precipitation radar over a vector-tile base map rendered with Unicode Braille characters — real text labels for cities and water, national/state borders at every zoom (plus county lines at zoom 9+), with pan, zoom, and animation playback controls
 - **Location Search** — Search by city name or enter coordinates manually; save favorite locations for quick access
 - **Auto-Detection** — Automatically detects your location via IP geolocation on startup
 - **Unit Toggle** — Switch between metric (°C) and imperial (°F) units on the fly
 - **Cross-Platform** — Works on Windows, macOS, and Linux
-- **No API Keys Required** — Uses free, open APIs (Open-Meteo, RainViewer, OpenStreetMap)
+- **No API Keys Required** — Uses free, open APIs (Open-Meteo, RainViewer, OpenFreeMap)
 - **Mouse Support** — Full mouse cell motion support via the Bubble Tea framework
 
 
@@ -216,5 +216,6 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 - [Bubbles](https://github.com/charmbracelet/bubbles) — UI components (spinner, text input)
 - [Open-Meteo](https://open-meteo.com/) — Free weather forecast and geocoding API
 - [RainViewer](https://www.rainviewer.com/) — Precipitation radar tile data
-- [OpenStreetMap](https://www.openstreetmap.org/) — Base map tiles
+- [OpenFreeMap](https://openfreemap.org/) — Vector base map tiles ([OpenStreetMap](https://www.openstreetmap.org/) data)
+- [mapscii](https://github.com/rastapasta/mapscii/) — Terminal map rendering approach and style, ported to Go for the radar base map
 - [ip-api.com](http://ip-api.com/) — IP-based geolocation
