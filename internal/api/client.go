@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -17,6 +18,11 @@ const (
 type Client struct {
 	httpClient *http.Client
 	tileCache  *TileCache
+
+	// Cached RainViewer weather-maps index (see fetchRainViewerMaps)
+	rainMapsMu sync.Mutex
+	rainMaps   *RainViewerResponse
+	rainMapsAt time.Time
 }
 
 // NewClient creates a new API client
