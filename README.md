@@ -14,7 +14,7 @@ A terminal-based weather application built in Go. View current conditions, hourl
 - **Current Weather** — Temperature, "feels like", humidity, wind, pressure, cloud cover, precipitation, visibility, and sunrise/sunset times with ASCII-art weather icons
 - **Hourly Forecast** — 24-hour forecast table with temperature, humidity, wind speed, and precipitation
 - **Daily Forecast** — 7-day outlook with high/low temps, precipitation probability, and wind speeds
-- **Animated Radar** — Live precipitation radar over a vector-tile base map rendered with Unicode Braille characters — real text labels for cities and water, national/state borders at every zoom (plus county lines at zoom 9+), with pan, zoom, and animation playback controls
+- **Animated Radar** — Live precipitation radar covering the past 2 hours at 10-minute intervals (plus short-term nowcast frames when available), over a vector-tile base map rendered with Unicode Braille characters — real text labels for cities and water, national/state borders at every zoom (plus county lines at zoom 9+), with pan, zoom, and animation playback controls
 - **Location Search** — Search by city name or enter coordinates manually; save favorite locations for quick access
 - **Auto-Detection** — Automatically detects your location via IP geolocation on startup
 - **Unit Toggle** — Switch between metric (°C) and imperial (°F) units on the fly

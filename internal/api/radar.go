@@ -83,6 +83,7 @@ type RainViewerEntry struct {
 type TileCache struct {
 	mu    sync.RWMutex
 	tiles map[string]image.Image
+	order []string // insertion order, used for FIFO eviction
 }
 
 // NewTileCache creates a new tile cache
@@ -98,12 +99,20 @@ func (tc *TileCache) Get(key string) (image.Image, bool) {
 	return img, ok
 }
 
-// Set stores a tile in the cache, evicting all entries if the cache is too large.
+// Set stores a tile in the cache. When the cache is full, the oldest half of
+// the entries is evicted so recently fetched tiles survive pans and zooms.
 func (tc *TileCache) Set(key string, img image.Image) {
 	tc.mu.Lock()
 	defer tc.mu.Unlock()
-	if len(tc.tiles) >= maxCacheEntries {
-		clear(tc.tiles)
+	if _, exists := tc.tiles[key]; !exists {
+		if len(tc.tiles) >= maxCacheEntries {
+			half := len(tc.order) / 2
+			for _, k := range tc.order[:half] {
+				delete(tc.tiles, k)
+			}
+			tc.order = append([]string(nil), tc.order[half:]...)
+		}
+		tc.order = append(tc.order, key)
 	}
 	tc.tiles[key] = img
 }
@@ -114,7 +123,8 @@ const (
 	maxRainZoom       = 7     // RainViewer supports up to zoom 7
 	rainColorScheme   = 6     // NEXRAD Level III
 	rainOptions       = "1_1" // smooth + snow
-	maxCacheEntries   = 512   // evict all when exceeded
+	maxCacheEntries   = 1024  // evict oldest half when exceeded
+	rainMapsTTL       = time.Minute // how long the weather-maps index is reused
 )
 
 // tileGrid holds the computed tile range and composite dimensions for a viewport.
@@ -208,7 +218,9 @@ func (c *Client) FetchRadar(lat, lon float64, zoom int, viewWidthChars, viewHeig
 	entries = append(entries, rainResp.Radar.Past...)
 	entries = append(entries, rainResp.Radar.Nowcast...)
 
-	maxFrames := 6
+	// RainViewer provides 2 hours of past data at 10-minute intervals (13
+	// frames) plus 30 minutes of nowcast (3 frames).
+	maxFrames := 16
 	if len(entries) > maxFrames {
 		entries = entries[len(entries)-maxFrames:]
 	}
@@ -301,11 +313,23 @@ func upscaleRainToMapSpace(rain *image.RGBA, mapGrid, rainGrid tileGrid, mapZoom
 	return out
 }
 
+// fetchRainViewerMaps returns the weather-maps index, reusing a cached copy
+// for rainMapsTTL so pans and zooms don't refetch it. Keeping the index (and
+// its frame paths) stable also keeps tile cache keys stable across movements.
 func (c *Client) fetchRainViewerMaps() (*RainViewerResponse, error) {
+	c.rainMapsMu.Lock()
+	defer c.rainMapsMu.Unlock()
+
+	if c.rainMaps != nil && time.Since(c.rainMapsAt) < rainMapsTTL {
+		return c.rainMaps, nil
+	}
+
 	var result RainViewerResponse
 	if err := c.get(rainViewerMapsURL, &result); err != nil {
 		return nil, err
 	}
+	c.rainMaps = &result
+	c.rainMapsAt = time.Now()
 	return &result, nil
 }
 
