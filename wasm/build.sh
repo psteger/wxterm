@@ -13,6 +13,8 @@ OUT_DIR="${1:-wasm/dist}"
 WORK="$(mktemp -d)"
 trap 'chmod -R u+w "$WORK"; rm -rf "$WORK"' EXIT
 
+# go list only reports source directories for modules already downloaded.
+go mod download github.com/charmbracelet/bubbletea github.com/atotto/clipboard
 TEA_DIR="$(go list -m -f '{{.Dir}}' github.com/charmbracelet/bubbletea)"
 CLIP_DIR="$(go list -m -f '{{.Dir}}' github.com/atotto/clipboard)"
 cp -r "$TEA_DIR" "$WORK/bubbletea"

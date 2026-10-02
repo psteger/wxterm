@@ -10,11 +10,17 @@ import (
 
 const storageKey = "wxterm.config"
 
-// In the browser the config lives in localStorage. syscall/js panics on
-// JavaScript exceptions (storage blocked, quota), so convert them to errors.
+// In the browser the config lives in localStorage. Use Reflect.get through Call:
+// Call converts JavaScript exceptions to recoverable Go panics, whereas Get
+// lets a throwing localStorage getter escape directly into JavaScript.
+func browserStorage() js.Value {
+	return js.Global().Get("Reflect").Call("get", js.Global(), "localStorage")
+}
+
+// Convert storage access and quota exceptions to errors.
 func readConfig() (data []byte, err error) {
 	defer recoverJS(&err)
-	v := js.Global().Get("localStorage").Call("getItem", storageKey)
+	v := browserStorage().Call("getItem", storageKey)
 	if v.IsNull() {
 		return nil, os.ErrNotExist
 	}
@@ -23,7 +29,7 @@ func readConfig() (data []byte, err error) {
 
 func writeConfig(data []byte) (err error) {
 	defer recoverJS(&err)
-	js.Global().Get("localStorage").Call("setItem", storageKey, string(data))
+	browserStorage().Call("setItem", storageKey, string(data))
 	return nil
 }
 
