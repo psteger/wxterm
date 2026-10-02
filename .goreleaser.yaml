@@ -5,6 +5,8 @@ project_name: wxterm
 before:
   hooks:
     - go mod tidy
+    - env WXTERM_VERSION={{ .Version }} ./wasm/build.sh wasm/dist
+    - tar -czf wasm/dist/wxterm_{{ .Version }}_wasm.tar.gz -C wasm/dist wxterm.wasm wasm_exec.js
 
 builds:
   - main: .
@@ -22,15 +24,17 @@ builds:
       - -s -w -X main.version={{.Version}} -X main.commit={{.ShortCommit}} -X main.date={{.Date}}
 
 archives:
-  - format: tar.gz
+  - formats: [tar.gz]
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
     format_overrides:
       - goos: windows
-        format: zip
+        formats: [zip]
 
 checksum:
   name_template: "checksums.txt"
+  extra_files:
+    - glob: "wasm/dist/wxterm_{{ .Version }}_wasm.tar.gz"
 
 changelog:
   sort: asc
@@ -46,3 +50,5 @@ release:
     name: wxterm
   draft: false
   prerelease: auto
+  extra_files:
+    - glob: "wasm/dist/wxterm_{{ .Version }}_wasm.tar.gz"
