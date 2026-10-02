@@ -187,6 +187,10 @@ wxterm stores its configuration at:
 
 wxterm also compiles to WebAssembly and runs in a browser terminal ([xterm.js](https://xtermjs.org)); try it at [patchsteger.com/wxterm](https://patchsteger.com/wxterm).
 
+Releases include `wxterm_<version>_wasm.tar.gz`, containing `wxterm.wasm` and the matching `wasm_exec.js` loader. The archive is listed in `checksums.txt`, and the program embeds the release version. Deploy both files together to your browser host; publishing a release does not deploy the website.
+
+To build locally:
+
 ```sh
 ./wasm/build.sh [out-dir]   # writes wxterm.wasm and wasm_exec.js (default: wasm/dist)
 ```
