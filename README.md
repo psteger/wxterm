@@ -183,6 +183,16 @@ wxterm stores its configuration at:
 }
 ```
 
+## Browser build
+
+wxterm also compiles to WebAssembly and runs in a browser terminal ([xterm.js](https://xtermjs.org)); try it at [patchsteger.com/wxterm](https://patchsteger.com/wxterm).
+
+```sh
+./wasm/build.sh [out-dir]   # writes wxterm.wasm and wasm_exec.js (default: wasm/dist)
+```
+
+The browser entrypoint is `main_js.go`. Bubble Tea v1 has no `js` support, so the script builds against patched copies of it and of `atotto/clipboard` (stubs in `wasm/stubs/`) through `-modfile`, leaving `go.mod` untouched. The host page provides `wxtermWrite`, `wxtermSize` and `wxtermExit`, and the program exports `wxtermInput` and `wxtermResize`. In the browser, location lookup uses ipwho.is (HTTPS) and settings are kept in `localStorage`.
+
 ## Contributing
 
 Contributions are welcome! Here's how to get started:

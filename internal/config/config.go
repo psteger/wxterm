@@ -3,7 +3,6 @@ package config
 import (
 	"encoding/json"
 	"os"
-	"path/filepath"
 
 	"wxterm/internal/location"
 )
@@ -19,13 +18,7 @@ type Config struct {
 
 // Load reads the config file from the user's config directory
 func Load() (*Config, error) {
-	configPath, err := getConfigPath()
-	if err != nil {
-		return &Config{}, nil
-	}
-
-	// #nosec G304 -- path is os.UserConfigDir() plus fixed names; no user input
-	data, err := os.ReadFile(configPath)
+	data, err := readConfig()
 	if err != nil {
 		if os.IsNotExist(err) {
 			return &Config{}, nil
@@ -43,23 +36,12 @@ func Load() (*Config, error) {
 
 // Save writes the config to the user's config directory
 func (c *Config) Save() error {
-	configPath, err := getConfigPath()
-	if err != nil {
-		return err
-	}
-
-	// Ensure directory exists
-	dir := filepath.Dir(configPath)
-	if err := os.MkdirAll(dir, 0750); err != nil {
-		return err
-	}
-
 	data, err := json.MarshalIndent(c, "", "  ")
 	if err != nil {
 		return err
 	}
 
-	return os.WriteFile(configPath, data, 0600)
+	return writeConfig(data)
 }
 
 // AddSavedLocation adds a location to saved locations if not already present
@@ -82,12 +64,4 @@ func (c *Config) RemoveSavedLocation(idx int) {
 // SetDefaultLocation sets the default location
 func (c *Config) SetDefaultLocation(loc location.Location) {
 	c.DefaultLocation = &loc
-}
-
-func getConfigPath() (string, error) {
-	configDir, err := os.UserConfigDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(configDir, "wxterm", configFileName), nil
 }
